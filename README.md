@@ -1,0 +1,428 @@
+# Skald PHP SDK
+
+Official PHP SDK for [Skald API](https://useskald.com) - A knowledge base management system that automatically processes memos (summarizes, chunks, and indexes them) and provides semantic search, AI chat, and document generation capabilities.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PHP Version](https://img.shields.io/badge/php-%5E8.1-blue)](https://www.php.net/)
+
+## Features
+
+- **Memo Management**: Create and store memos with automatic processing (summarization, chunking, indexing)
+- **Semantic Search**: Search through your knowledge base using vector search or title matching
+- **AI Chat**: Ask questions about your knowledge base with AI-powered responses and inline citations
+- **Document Generation**: Generate documents based on prompts with context from your knowledge base
+- **Streaming Support**: Real-time streaming for chat and document generation operations
+- **Type-Safe**: Fully typed with PHP 8.1+ features including enums and readonly properties
+
+## Requirements
+
+- PHP 8.1 or higher
+- cURL extension
+- JSON extension
+
+## Installation
+
+Install via Composer:
+
+```bash
+composer require skald/skald-php
+```
+
+## Quick Start
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use Skald\Skald;
+use Skald\Types\MemoData;
+use Skald\Types\SearchRequest;
+use Skald\Types\SearchMethod;
+use Skald\Types\ChatRequest;
+
+// Initialize the client
+$skald = new Skald('sk_proj_your_api_key');
+
+// Create a memo
+$result = $skald->createMemo(new MemoData(
+    title: 'Meeting Notes - Q1 Planning',
+    content: 'Discussed quarterly goals, hiring plans, and budget allocation...',
+    tags: ['meeting', 'planning', 'q1'],
+    source: 'notion'
+));
+
+// Search for memos
+$results = $skald->search(new SearchRequest(
+    query: 'quarterly goals',
+    searchMethod: SearchMethod::CHUNK_VECTOR_SEARCH,
+    limit: 10
+));
+
+foreach ($results->results as $result) {
+    echo "Title: {$result->title}\n";
+    echo "Summary: {$result->summary}\n";
+    echo "Relevance: {$result->distance}\n\n";
+}
+
+// Ask questions about your knowledge base
+$response = $skald->chat(new ChatRequest(
+    query: 'What are our main goals for Q1?'
+));
+
+echo $response->response; // "The main Q1 goals are... [[1]]"
+```
+
+## API Reference
+
+### Client Initialization
+
+```php
+$skald = new Skald(string $apiKey, ?string $baseUrl = null);
+```
+
+- `$apiKey`: Your Skald API key (required)
+- `$baseUrl`: Optional custom API base URL (defaults to `https://api.useskald.com`)
+
+### Creating Memos
+
+```php
+$response = $skald->createMemo(MemoData $memoData): CreateMemoResponse;
+```
+
+**Parameters:**
+
+```php
+new MemoData(
+    title: string,              // Required - memo title (max 255 chars)
+    content: string,            // Required - memo content
+    metadata: ?array = null,    // Optional - custom JSON metadata
+    reference_id: ?string = null, // Optional - external ID mapping
+    tags: ?array = null,        // Optional - array of tags
+    source: ?string = null      // Optional - source system (e.g., "notion")
+);
+```
+
+**Example:**
+
+```php
+$result = $skald->createMemo(new MemoData(
+    title: 'Product Requirements',
+    content: 'The new mobile app should support offline mode...',
+    metadata: ['author' => 'John Doe', 'version' => '1.0'],
+    tags: ['product', 'mobile', 'requirements'],
+    source: 'confluence'
+));
+
+// Returns: CreateMemoResponse { ok: true }
+```
+
+### Searching Memos
+
+```php
+$response = $skald->search(SearchRequest $searchParams): SearchResponse;
+```
+
+**Search Methods:**
+
+- `SearchMethod::CHUNK_VECTOR_SEARCH` - Semantic search on memo chunks (returns distance scores 0-2)
+- `SearchMethod::TITLE_CONTAINS` - Case-insensitive substring match on titles
+- `SearchMethod::TITLE_STARTSWITH` - Case-insensitive prefix match on titles
+
+**Parameters:**
+
+```php
+new SearchRequest(
+    query: string,                  // Required - search query
+    searchMethod: SearchMethod,     // Required - search method
+    limit: ?int = null,            // Optional - results limit (1-50, default 10)
+    tags: ?array = null            // Optional - filter by tags
+);
+```
+
+**Example:**
+
+```php
+$results = $skald->search(new SearchRequest(
+    query: 'product requirements',
+    searchMethod: SearchMethod::CHUNK_VECTOR_SEARCH,
+    limit: 5,
+    tags: ['product']
+));
+
+foreach ($results->results as $result) {
+    echo "UUID: {$result->uuid}\n";
+    echo "Title: {$result->title}\n";
+    echo "Summary: {$result->summary}\n";
+    echo "Snippet: {$result->content_snippet}\n";
+    echo "Distance: {$result->distance}\n\n"; // Lower = more relevant
+}
+```
+
+### AI Chat (Non-Streaming)
+
+```php
+$response = $skald->chat(ChatRequest $chatParams): ChatResponse;
+```
+
+**Parameters:**
+
+```php
+new ChatRequest(
+    query: string,              // Required - question to ask
+    project_id: ?string = null  // Optional - project UUID
+);
+```
+
+**Example:**
+
+```php
+$response = $skald->chat(new ChatRequest(
+    query: 'What are the key features of our mobile app?'
+));
+
+echo $response->response;
+// Output: "The mobile app has several key features: 1. Offline mode [[1]]
+//          2. Push notifications [[2]] 3. Biometric authentication [[1]]"
+
+// Citations [[1]], [[2]], etc. reference source memos
+```
+
+### AI Chat (Streaming)
+
+```php
+$stream = $skald->streamedChat(ChatRequest $chatParams): Generator<ChatStreamEvent>;
+```
+
+**Example:**
+
+```php
+$stream = $skald->streamedChat(new ChatRequest(
+    query: 'Summarize our product roadmap'
+));
+
+foreach ($stream as $event) {
+    if ($event->isToken()) {
+        echo $event->content; // Print each token as it arrives
+    } elseif ($event->isDone()) {
+        echo "\nDone!\n";
+        break;
+    }
+}
+```
+
+### Document Generation (Non-Streaming)
+
+```php
+$response = $skald->generateDoc(GenerateDocRequest $generateParams): GenerateDocResponse;
+```
+
+**Parameters:**
+
+```php
+new GenerateDocRequest(
+    prompt: string,             // Required - document generation prompt
+    rules: ?string = null,      // Optional - style/format rules
+    project_id: ?string = null  // Optional - project UUID
+);
+```
+
+**Example:**
+
+```php
+$response = $skald->generateDoc(new GenerateDocRequest(
+    prompt: 'Create a product requirements document for the mobile app',
+    rules: 'Use formal business language. Include sections: Overview, Requirements, Timeline'
+));
+
+echo $response->response;
+// Outputs a full document with inline citations
+```
+
+### Document Generation (Streaming)
+
+```php
+$stream = $skald->streamedGenerateDoc(GenerateDocRequest $generateParams): Generator<GenerateDocStreamEvent>;
+```
+
+**Example:**
+
+```php
+$stream = $skald->streamedGenerateDoc(new GenerateDocRequest(
+    prompt: 'Write a technical specification for our API',
+    rules: 'Include Architecture, Endpoints, and Security sections'
+));
+
+foreach ($stream as $event) {
+    if ($event->isToken()) {
+        echo $event->content;
+    } elseif ($event->isDone()) {
+        echo "\n[Generation complete]\n";
+        break;
+    }
+}
+```
+
+## Error Handling
+
+All API errors throw `Skald\Exceptions\SkaldException`:
+
+```php
+use Skald\Exceptions\SkaldException;
+
+try {
+    $result = $skald->createMemo(new MemoData(
+        title: 'Test',
+        content: 'Content'
+    ));
+} catch (SkaldException $e) {
+    // Error format: "Skald API error (STATUS_CODE): ERROR_MESSAGE"
+    echo "Error: " . $e->getMessage();
+    echo "HTTP Status: " . $e->getCode();
+}
+```
+
+## Type Reference
+
+### Enums
+
+#### SearchMethod
+
+```php
+enum SearchMethod: string
+{
+    case CHUNK_VECTOR_SEARCH = 'chunk_vector_search';
+    case TITLE_CONTAINS = 'title_contains';
+    case TITLE_STARTSWITH = 'title_startswith';
+}
+```
+
+### Request Types
+
+#### MemoData
+- `title: string` - Memo title (max 255 characters)
+- `content: string` - Memo content
+- `metadata: ?array` - Custom metadata
+- `reference_id: ?string` - External reference ID
+- `tags: ?array` - Array of tag strings
+- `source: ?string` - Source system identifier
+
+#### SearchRequest
+- `query: string` - Search query
+- `searchMethod: SearchMethod` - Search method to use
+- `limit: ?int` - Results limit (1-50, default 10)
+- `tags: ?array` - Filter by tags
+
+#### ChatRequest
+- `query: string` - Question to ask
+- `project_id: ?string` - Project UUID (for token auth)
+
+#### GenerateDocRequest
+- `prompt: string` - Document generation prompt
+- `rules: ?string` - Style/format guidelines
+- `project_id: ?string` - Project UUID (for token auth)
+
+### Response Types
+
+#### CreateMemoResponse
+- `ok: bool` - Success status
+
+#### SearchResponse
+- `results: SearchResult[]` - Array of search results
+
+#### SearchResult
+- `uuid: string` - Memo unique identifier
+- `title: string` - Memo title
+- `summary: string` - Auto-generated summary
+- `content_snippet: string` - Content snippet
+- `distance: ?float` - Relevance score (0-2 for vector search, null for title searches)
+
+#### ChatResponse
+- `ok: bool` - Success status
+- `response: string` - AI response with inline citations
+- `intermediate_steps: array` - Debug information
+
+#### GenerateDocResponse
+- `ok: bool` - Success status
+- `response: string` - Generated document with citations
+- `intermediate_steps: array` - Debug information
+
+### Stream Event Types
+
+#### ChatStreamEvent & GenerateDocStreamEvent
+- `type: string` - Event type ('token' or 'done')
+- `content: ?string` - Token content (only for 'token' events)
+- `isToken(): bool` - Check if event is a token
+- `isDone(): bool` - Check if event signals completion
+
+## Examples
+
+See the `examples/` directory for complete working examples:
+
+- `create_memo.php` - Creating memos with various options
+- `search.php` - All search methods with examples
+- `chat.php` - Non-streaming chat
+- `chat_streaming.php` - Streaming chat with real-time output
+- `generate_doc.php` - Document generation
+- `generate_doc_streaming.php` - Streaming document generation
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Install dependencies
+composer install
+
+# Run unit tests
+composer test
+
+# Run with coverage
+vendor/bin/phpunit --coverage-html coverage
+
+# Run static analysis
+composer phpstan
+
+# Check code style
+composer cs-check
+
+# Fix code style
+composer cs-fix
+```
+
+### Integration Tests
+
+Integration tests require a valid Skald API key:
+
+```bash
+export SKALD_API_KEY=sk_proj_your_api_key
+composer test
+```
+
+## Development
+
+### Code Quality Tools
+
+This library uses:
+- **PHPUnit** for testing
+- **PHPStan** (level 8) for static analysis
+- **PHP_CodeSniffer** for PSR-12 compliance
+
+Run all checks:
+
+```bash
+composer test      # Run tests
+composer phpstan   # Static analysis
+composer cs-check  # Code style check
+```
+
+## License
+
+MIT License - Copyright (c) 2025 Skald Labs, Inc.
+
+See [LICENSE](LICENSE) file for details.
+
+
+## Contributing
+
+If you've spotted a bug or want a new feature, feel free to submit a PR. 
