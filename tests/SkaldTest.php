@@ -14,6 +14,7 @@ use Skald\Types\GenerateDocRequest;
 use Skald\Types\MemoData;
 use Skald\Types\SearchMethod;
 use Skald\Types\SearchRequest;
+use Skald\Types\UpdateMemoData;
 
 /**
  * Unit tests for Skald PHP SDK with mocked API responses.
@@ -351,6 +352,295 @@ class SkaldTest extends TestCase
         $this->assertArrayNotHasKey('reference_id', $array);
         $this->assertArrayNotHasKey('tags', $array);
         $this->assertArrayNotHasKey('source', $array);
+    }
+
+    public function testUpdateMemoSuccess(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'Updated Title',
+            content: 'Updated content'
+        );
+
+        $response = $this->client->updateMemo('test-memo-uuid', $updateData);
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertEquals('/api/v1/memo/test-memo-uuid', $request['path']);
+        $this->assertEquals('PATCH', $request['method']);
+        $this->assertStringContainsString('Bearer test_api_key', $request['headers']['Authorization']);
+
+        $body = json_decode($request['body'], true);
+        $this->assertEquals('Updated Title', $body['title']);
+        $this->assertEquals('Updated content', $body['content']);
+    }
+
+    public function testUpdateMemoWithAllFields(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'New Title',
+            content: 'New content',
+            metadata: ['updated' => true],
+            client_reference_id: 'new-ref-123',
+            source: 'updated-source',
+            expiration_date: '2025-12-31T23:59:59Z'
+        );
+
+        $response = $this->client->updateMemo('memo-uuid', $updateData);
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $body = json_decode($request['body'], true);
+        $this->assertEquals('New Title', $body['title']);
+        $this->assertEquals('New content', $body['content']);
+        $this->assertEquals(['updated' => true], $body['metadata']);
+        $this->assertEquals('new-ref-123', $body['client_reference_id']);
+        $this->assertEquals('updated-source', $body['source']);
+        $this->assertEquals('2025-12-31T23:59:59Z', $body['expiration_date']);
+    }
+
+    public function testUpdateMemoWithPartialFields(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'Only Title Updated'
+        );
+
+        $response = $this->client->updateMemo('memo-uuid', $updateData);
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $body = json_decode($request['body'], true);
+        $this->assertEquals('Only Title Updated', $body['title']);
+        $this->assertArrayNotHasKey('content', $body);
+        $this->assertArrayNotHasKey('metadata', $body);
+        $this->assertArrayNotHasKey('client_reference_id', $body);
+        $this->assertArrayNotHasKey('source', $body);
+        $this->assertArrayNotHasKey('expiration_date', $body);
+    }
+
+    public function testUpdateMemoNotFound(): void
+    {
+        $mockErrorResponse = [
+            'error' => 'Memo not found',
+        ];
+
+        $this->mockServer->queueResponse(404, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(404\):/');
+
+        $this->client->updateMemo('non-existent-uuid', new UpdateMemoData(
+            title: 'Test'
+        ));
+    }
+
+    public function testUpdateMemoDataToArray(): void
+    {
+        $updateData = new UpdateMemoData(
+            title: 'Test Title',
+            content: 'Test Content',
+            metadata: ['key' => 'value'],
+            client_reference_id: 'ref123',
+            source: 'test',
+            expiration_date: '2025-12-31T23:59:59Z'
+        );
+
+        $array = $updateData->toArray();
+
+        $this->assertEquals('Test Title', $array['title']);
+        $this->assertEquals('Test Content', $array['content']);
+        $this->assertEquals(['key' => 'value'], $array['metadata']);
+        $this->assertEquals('ref123', $array['client_reference_id']);
+        $this->assertEquals('test', $array['source']);
+        $this->assertEquals('2025-12-31T23:59:59Z', $array['expiration_date']);
+    }
+
+    public function testUpdateMemoDataToArrayWithDefaults(): void
+    {
+        $updateData = new UpdateMemoData();
+
+        $array = $updateData->toArray();
+
+        $this->assertEmpty($array);
+        $this->assertArrayNotHasKey('title', $array);
+        $this->assertArrayNotHasKey('content', $array);
+        $this->assertArrayNotHasKey('metadata', $array);
+        $this->assertArrayNotHasKey('client_reference_id', $array);
+        $this->assertArrayNotHasKey('source', $array);
+        $this->assertArrayNotHasKey('expiration_date', $array);
+    }
+
+    public function testUpdateMemoWithReferenceId(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'Updated via Reference ID'
+        );
+
+        $response = $this->client->updateMemo('external-ref-123', $updateData, 'reference_id');
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('id_type=reference_id', $request['path']);
+        $this->assertStringContainsString('/api/v1/memo/external-ref-123', $request['path']);
+        $this->assertEquals('PATCH', $request['method']);
+    }
+
+    public function testUpdateMemoWithProjectId(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'Updated with Project ID'
+        );
+
+        $response = $this->client->updateMemo(
+            'memo-uuid',
+            $updateData,
+            'memo_uuid',
+            'project-uuid-123'
+        );
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('project_id=project-uuid-123', $request['path']);
+    }
+
+    public function testUpdateMemoWithReferenceIdAndProjectId(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            content: 'New content'
+        );
+
+        $response = $this->client->updateMemo(
+            'external-ref-456',
+            $updateData,
+            'reference_id',
+            'project-uuid-789'
+        );
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('id_type=reference_id', $request['path']);
+        $this->assertStringContainsString('project_id=project-uuid-789', $request['path']);
+        $this->assertStringContainsString('/api/v1/memo/external-ref-456', $request['path']);
+    }
+
+    public function testDeleteMemoSuccess(): void
+    {
+        $this->mockServer->queueResponse(204, null);
+
+        $this->client->deleteMemo('test-memo-uuid');
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertEquals('/api/v1/memo/test-memo-uuid', $request['path']);
+        $this->assertEquals('DELETE', $request['method']);
+        $this->assertStringContainsString('Bearer test_api_key', $request['headers']['Authorization']);
+    }
+
+    public function testDeleteMemoWithReferenceId(): void
+    {
+        $this->mockServer->queueResponse(204, null);
+
+        $this->client->deleteMemo('external-ref-123', 'reference_id');
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('id_type=reference_id', $request['path']);
+        $this->assertStringContainsString('/api/v1/memo/external-ref-123', $request['path']);
+        $this->assertEquals('DELETE', $request['method']);
+    }
+
+    public function testDeleteMemoWithProjectId(): void
+    {
+        $this->mockServer->queueResponse(204, null);
+
+        $this->client->deleteMemo('memo-uuid', 'memo_uuid', 'project-uuid-123');
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('project_id=project-uuid-123', $request['path']);
+        $this->assertEquals('DELETE', $request['method']);
+    }
+
+    public function testDeleteMemoWithReferenceIdAndProjectId(): void
+    {
+        $this->mockServer->queueResponse(204, null);
+
+        $this->client->deleteMemo('external-ref-789', 'reference_id', 'project-uuid-456');
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('id_type=reference_id', $request['path']);
+        $this->assertStringContainsString('project_id=project-uuid-456', $request['path']);
+        $this->assertStringContainsString('/api/v1/memo/external-ref-789', $request['path']);
+    }
+
+    public function testDeleteMemoNotFound(): void
+    {
+        $mockErrorResponse = [
+            'error' => 'Memo not found',
+        ];
+
+        $this->mockServer->queueResponse(404, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(404\):/');
+
+        $this->client->deleteMemo('non-existent-uuid');
+    }
+
+    public function testDeleteMemoAccessDenied(): void
+    {
+        $mockErrorResponse = [
+            'error' => 'Access denied',
+        ];
+
+        $this->mockServer->queueResponse(403, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(403\):/');
+
+        $this->client->deleteMemo('forbidden-uuid');
+    }
+
+    public function testUpdateMemoInvalidIdType(): void
+    {
+        $mockErrorResponse = [
+            'error' => "id_type must be either 'memo_uuid' or 'reference_id'",
+        ];
+
+        $this->mockServer->queueResponse(400, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(400\):/');
+
+        $this->client->updateMemo('memo-id', new UpdateMemoData(title: 'Test'), 'invalid_type');
+    }
+
+    public function testDeleteMemoInvalidIdType(): void
+    {
+        $mockErrorResponse = [
+            'error' => "id_type must be either 'memo_uuid' or 'reference_id'",
+        ];
+
+        $this->mockServer->queueResponse(400, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(400\):/');
+
+        $this->client->deleteMemo('memo-id', 'invalid_type');
     }
 
     public function testSearchMethodEnum(): void

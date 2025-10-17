@@ -117,6 +117,112 @@ $result = $skald->createMemo(new MemoData(
 // Returns: CreateMemoResponse { ok: true }
 ```
 
+### Updating Memos
+
+```php
+$response = $skald->updateMemo(
+    string $memoId,
+    UpdateMemoData $updateData,
+    string $idType = 'memo_uuid',
+    ?string $projectId = null
+): CreateMemoResponse;
+```
+
+Update an existing memo with partial or complete changes. All fields are optional - only include the fields you want to update.
+
+**Important**: When `content` is updated, the memo is automatically reprocessed by the API (summary, tags, and chunks are regenerated). Other field updates preserve existing processing results.
+
+**Parameters:**
+
+- `$memoId` (string): The memo UUID or client reference ID
+- `$updateData` (UpdateMemoData): The fields to update
+- `$idType` (string, optional): Type of identifier - `'memo_uuid'` (default) or `'reference_id'`
+- `$projectId` (string|null, optional): Project UUID (required when using Token Authentication)
+
+```php
+new UpdateMemoData(
+    title: ?string = null,                  // Optional - memo title (max 255 chars)
+    content: ?string = null,                // Optional - memo content (triggers reprocessing)
+    metadata: ?array = null,                // Optional - custom JSON metadata
+    client_reference_id: ?string = null,    // Optional - external ID mapping (max 255 chars)
+    source: ?string = null,                 // Optional - source system (max 255 chars)
+    expiration_date: ?string = null         // Optional - expiration date (ISO 8601 format)
+);
+```
+
+**Examples:**
+
+```php
+use Skald\Types\UpdateMemoData;
+
+// Update by memo UUID (default)
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    title: 'Updated Title'
+));
+
+// Update by client reference ID
+$skald->updateMemo('external-id-123', new UpdateMemoData(
+    title: 'Updated via Reference ID'
+), 'reference_id');
+
+// Update with project ID (for Token Authentication)
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    content: 'New content'
+), 'memo_uuid', 'project-uuid-123');
+
+// Update content (triggers automatic reprocessing)
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    content: 'New content - this will regenerate summary, tags, and chunks'
+));
+
+// Update multiple fields
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    title: 'Updated Title',
+    metadata: ['updated_at' => time(), 'editor' => 'Jane'],
+    source: 'notion',
+    expiration_date: '2025-12-31T23:59:59Z'
+));
+
+// Update metadata without triggering reprocessing
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    metadata: ['last_viewed' => time(), 'view_count' => 42]
+));
+```
+
+### Deleting Memos
+
+```php
+$skald->deleteMemo(
+    string $memoId,
+    string $idType = 'memo_uuid',
+    ?string $projectId = null
+): void;
+```
+
+Delete a memo and all its associated data (content, summary, tags, chunks).
+
+**Parameters:**
+
+- `$memoId` (string): The memo UUID or client reference ID
+- `$idType` (string, optional): Type of identifier - `'memo_uuid'` (default) or `'reference_id'`
+- `$projectId` (string|null, optional): Project UUID (required when using Token Authentication)
+
+**Examples:**
+
+```php
+// Delete by memo UUID (default)
+$skald->deleteMemo('memo-uuid-here');
+
+// Delete by client reference ID
+$skald->deleteMemo('external-id-123', 'reference_id');
+
+// Delete with project ID (for Token Authentication)
+$skald->deleteMemo('memo-uuid-here', 'memo_uuid', 'project-uuid-123');
+
+// Delete by reference ID with project ID
+$skald->deleteMemo('external-id-456', 'reference_id', 'project-uuid-789');
+```
+
 ### Searching Memos
 
 ```php
@@ -307,6 +413,14 @@ enum SearchMethod: string
 - `tags: ?array` - Array of tag strings
 - `source: ?string` - Source system identifier
 
+#### UpdateMemoData
+- `title: ?string` - Memo title (max 255 characters)
+- `content: ?string` - Memo content (triggers reprocessing when updated)
+- `metadata: ?array` - Custom metadata
+- `client_reference_id: ?string` - External reference ID (max 255 characters)
+- `source: ?string` - Source system identifier (max 255 characters)
+- `expiration_date: ?string` - Expiration date in ISO 8601 format
+
 #### SearchRequest
 - `query: string` - Search query
 - `searchMethod: SearchMethod` - Search method to use
@@ -360,6 +474,8 @@ enum SearchMethod: string
 See the `examples/` directory for complete working examples:
 
 - `create_memo.php` - Creating memos with various options
+- `update_memo.php` - Updating existing memos (including by reference ID)
+- `delete_memo.php` - Deleting memos (by UUID or reference ID)
 - `search.php` - All search methods with examples
 - `chat.php` - Non-streaming chat
 - `chat_streaming.php` - Streaming chat with real-time output
