@@ -8,6 +8,9 @@ use PHPUnit\Framework\TestCase;
 use Skald\Types\ChatResponse;
 use Skald\Types\ChatStreamEvent;
 use Skald\Types\CreateMemoResponse;
+use Skald\Types\Filter;
+use Skald\Types\FilterOperator;
+use Skald\Types\FilterType;
 use Skald\Types\GenerateDocResponse;
 use Skald\Types\GenerateDocStreamEvent;
 use Skald\Types\SearchResult;
@@ -159,5 +162,68 @@ class TypesTest extends TestCase
         ]);
 
         $this->assertTrue($doneEvent->isDone());
+    }
+
+    public function testFilterConstruction(): void
+    {
+        $filter = new Filter(
+            field: 'source',
+            operator: FilterOperator::EQ,
+            value: 'notion',
+            filterType: FilterType::NATIVE_FIELD
+        );
+
+        $this->assertEquals('source', $filter->field);
+        $this->assertEquals(FilterOperator::EQ, $filter->operator);
+        $this->assertEquals('notion', $filter->value);
+        $this->assertEquals(FilterType::NATIVE_FIELD, $filter->filterType);
+    }
+
+    public function testFilterNativeFieldStaticMethod(): void
+    {
+        $filter = Filter::nativeField('source', FilterOperator::EQ, 'notion');
+
+        $this->assertEquals('source', $filter->field);
+        $this->assertEquals(FilterOperator::EQ, $filter->operator);
+        $this->assertEquals('notion', $filter->value);
+        $this->assertEquals(FilterType::NATIVE_FIELD, $filter->filterType);
+    }
+
+    public function testFilterCustomMetadataStaticMethod(): void
+    {
+        $filter = Filter::customMetadata('department', FilterOperator::CONTAINS, 'engineering');
+
+        $this->assertEquals('department', $filter->field);
+        $this->assertEquals(FilterOperator::CONTAINS, $filter->operator);
+        $this->assertEquals('engineering', $filter->value);
+        $this->assertEquals(FilterType::CUSTOM_METADATA, $filter->filterType);
+    }
+
+    public function testFilterToArray(): void
+    {
+        $filter = Filter::nativeField('tags', FilterOperator::IN, ['important', 'urgent']);
+        $array = $filter->toArray();
+
+        $this->assertEquals('tags', $array['field']);
+        $this->assertEquals('in', $array['operator']);
+        $this->assertEquals(['important', 'urgent'], $array['value']);
+        $this->assertEquals('native_field', $array['filter_type']);
+    }
+
+    public function testFilterOperatorEnum(): void
+    {
+        $this->assertEquals('eq', FilterOperator::EQ->value);
+        $this->assertEquals('neq', FilterOperator::NEQ->value);
+        $this->assertEquals('contains', FilterOperator::CONTAINS->value);
+        $this->assertEquals('startswith', FilterOperator::STARTSWITH->value);
+        $this->assertEquals('endswith', FilterOperator::ENDSWITH->value);
+        $this->assertEquals('in', FilterOperator::IN->value);
+        $this->assertEquals('not_in', FilterOperator::NOT_IN->value);
+    }
+
+    public function testFilterTypeEnum(): void
+    {
+        $this->assertEquals('native_field', FilterType::NATIVE_FIELD->value);
+        $this->assertEquals('custom_metadata', FilterType::CUSTOM_METADATA->value);
     }
 }

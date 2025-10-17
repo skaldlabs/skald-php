@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Skald\Exceptions\SkaldException;
 use Skald\Skald;
 use Skald\Types\ChatRequest;
+use Skald\Types\Filter;
+use Skald\Types\FilterOperator;
 use Skald\Types\GenerateDocRequest;
 use Skald\Types\MemoData;
 use Skald\Types\SearchMethod;
@@ -387,5 +389,114 @@ class SkaldTest extends TestCase
         $this->assertEquals('Test rules', $array['rules']);
         $this->assertEquals('proj123', $array['project_id']);
         $this->assertFalse($array['stream']);
+    }
+
+    public function testSearchWithFilters(): void
+    {
+        $mockResults = [
+            'results' => [
+                [
+                    'uuid' => 'filtered-uuid-1',
+                    'title' => 'Filtered Result',
+                    'summary' => 'Summary',
+                    'content_snippet' => 'Snippet',
+                    'distance' => 0.3,
+                ],
+            ],
+        ];
+
+        $this->mockServer->queueResponse(200, $mockResults);
+
+        $filters = [
+            Filter::nativeField('source', FilterOperator::EQ, 'notion'),
+            Filter::customMetadata('department', FilterOperator::CONTAINS, 'engineering'),
+        ];
+
+        $searchRequest = new SearchRequest(
+            query: 'test query',
+            searchMethod: SearchMethod::CHUNK_VECTOR_SEARCH,
+            limit: 10,
+            filters: $filters
+        );
+
+        $response = $this->client->search($searchRequest);
+
+        $this->assertCount(1, $response->results);
+        $this->assertEquals('filtered-uuid-1', $response->results[0]->uuid);
+
+        // Verify filters were sent in the request
+        $request = $this->mockServer->getLastRequest();
+        $body = json_decode($request['body'], true);
+        $this->assertArrayHasKey('filters', $body);
+        $this->assertCount(2, $body['filters']);
+        $this->assertEquals('source', $body['filters'][0]['field']);
+        $this->assertEquals('eq', $body['filters'][0]['operator']);
+        $this->assertEquals('notion', $body['filters'][0]['value']);
+        $this->assertEquals('native_field', $body['filters'][0]['filter_type']);
+    }
+
+    public function testChatWithFilters(): void
+    {
+        $mockResponse = [
+            'ok' => true,
+            'response' => 'Filtered chat response',
+            'intermediate_steps' => [],
+        ];
+
+        $this->mockServer->queueResponse(200, $mockResponse);
+
+        $filters = [
+            Filter::nativeField('tags', FilterOperator::IN, ['important', 'urgent']),
+        ];
+
+        $chatRequest = new ChatRequest(
+            query: 'What are the urgent items?',
+            filters: $filters
+        );
+
+        $response = $this->client->chat($chatRequest);
+
+        $this->assertTrue($response->ok);
+        $this->assertEquals('Filtered chat response', $response->response);
+
+        // Verify filters were sent in the request
+        $request = $this->mockServer->getLastRequest();
+        $body = json_decode($request['body'], true);
+        $this->assertArrayHasKey('filters', $body);
+        $this->assertCount(1, $body['filters']);
+        $this->assertEquals('tags', $body['filters'][0]['field']);
+        $this->assertEquals('in', $body['filters'][0]['operator']);
+    }
+
+    public function testGenerateDocWithFilters(): void
+    {
+        $mockResponse = [
+            'ok' => true,
+            'response' => 'Filtered generated document',
+            'intermediate_steps' => [],
+        ];
+
+        $this->mockServer->queueResponse(200, $mockResponse);
+
+        $filters = [
+            Filter::nativeField('source', FilterOperator::EQ, 'confluence'),
+        ];
+
+        $generateRequest = new GenerateDocRequest(
+            prompt: 'Create a summary',
+            rules: 'Be concise',
+            filters: $filters
+        );
+
+        $response = $this->client->generateDoc($generateRequest);
+
+        $this->assertTrue($response->ok);
+        $this->assertEquals('Filtered generated document', $response->response);
+
+        // Verify filters were sent in the request
+        $request = $this->mockServer->getLastRequest();
+        $body = json_decode($request['body'], true);
+        $this->assertArrayHasKey('filters', $body);
+        $this->assertCount(1, $body['filters']);
     }
 }
