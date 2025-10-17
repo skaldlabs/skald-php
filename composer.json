@@ -1,7 +1,7 @@
 {
     "name": "skald/skald-php",
     "description": "Official PHP SDK for Skald API - Knowledge base management with semantic search, AI chat, and document generation",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "type": "library",
     "keywords": ["skald", "knowledge-base", "semantic-search", "ai", "chat", "document-generation", "api-client"],
     "license": "MIT",
