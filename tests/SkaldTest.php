@@ -12,6 +12,7 @@ use Skald\Types\GenerateDocRequest;
 use Skald\Types\MemoData;
 use Skald\Types\SearchMethod;
 use Skald\Types\SearchRequest;
+use Skald\Types\UpdateMemoData;
 
 /**
  * Unit tests for Skald PHP SDK with mocked API responses.
@@ -349,6 +350,130 @@ class SkaldTest extends TestCase
         $this->assertArrayNotHasKey('reference_id', $array);
         $this->assertArrayNotHasKey('tags', $array);
         $this->assertArrayNotHasKey('source', $array);
+    }
+
+    public function testUpdateMemoSuccess(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'Updated Title',
+            content: 'Updated content'
+        );
+
+        $response = $this->client->updateMemo('test-memo-uuid', $updateData);
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertEquals('/api/v1/memo/test-memo-uuid', $request['path']);
+        $this->assertEquals('PATCH', $request['method']);
+        $this->assertStringContainsString('Bearer test_api_key', $request['headers']['Authorization']);
+
+        $body = json_decode($request['body'], true);
+        $this->assertEquals('Updated Title', $body['title']);
+        $this->assertEquals('Updated content', $body['content']);
+    }
+
+    public function testUpdateMemoWithAllFields(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'New Title',
+            content: 'New content',
+            metadata: ['updated' => true],
+            client_reference_id: 'new-ref-123',
+            source: 'updated-source',
+            expiration_date: '2025-12-31T23:59:59Z'
+        );
+
+        $response = $this->client->updateMemo('memo-uuid', $updateData);
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $body = json_decode($request['body'], true);
+        $this->assertEquals('New Title', $body['title']);
+        $this->assertEquals('New content', $body['content']);
+        $this->assertEquals(['updated' => true], $body['metadata']);
+        $this->assertEquals('new-ref-123', $body['client_reference_id']);
+        $this->assertEquals('updated-source', $body['source']);
+        $this->assertEquals('2025-12-31T23:59:59Z', $body['expiration_date']);
+    }
+
+    public function testUpdateMemoWithPartialFields(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'Only Title Updated'
+        );
+
+        $response = $this->client->updateMemo('memo-uuid', $updateData);
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $body = json_decode($request['body'], true);
+        $this->assertEquals('Only Title Updated', $body['title']);
+        $this->assertArrayNotHasKey('content', $body);
+        $this->assertArrayNotHasKey('metadata', $body);
+        $this->assertArrayNotHasKey('client_reference_id', $body);
+        $this->assertArrayNotHasKey('source', $body);
+        $this->assertArrayNotHasKey('expiration_date', $body);
+    }
+
+    public function testUpdateMemoNotFound(): void
+    {
+        $mockErrorResponse = [
+            'error' => 'Memo not found',
+        ];
+
+        $this->mockServer->queueResponse(404, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(404\):/');
+
+        $this->client->updateMemo('non-existent-uuid', new UpdateMemoData(
+            title: 'Test'
+        ));
+    }
+
+    public function testUpdateMemoDataToArray(): void
+    {
+        $updateData = new UpdateMemoData(
+            title: 'Test Title',
+            content: 'Test Content',
+            metadata: ['key' => 'value'],
+            client_reference_id: 'ref123',
+            source: 'test',
+            expiration_date: '2025-12-31T23:59:59Z'
+        );
+
+        $array = $updateData->toArray();
+
+        $this->assertEquals('Test Title', $array['title']);
+        $this->assertEquals('Test Content', $array['content']);
+        $this->assertEquals(['key' => 'value'], $array['metadata']);
+        $this->assertEquals('ref123', $array['client_reference_id']);
+        $this->assertEquals('test', $array['source']);
+        $this->assertEquals('2025-12-31T23:59:59Z', $array['expiration_date']);
+    }
+
+    public function testUpdateMemoDataToArrayWithDefaults(): void
+    {
+        $updateData = new UpdateMemoData();
+
+        $array = $updateData->toArray();
+
+        $this->assertEmpty($array);
+        $this->assertArrayNotHasKey('title', $array);
+        $this->assertArrayNotHasKey('content', $array);
+        $this->assertArrayNotHasKey('metadata', $array);
+        $this->assertArrayNotHasKey('client_reference_id', $array);
+        $this->assertArrayNotHasKey('source', $array);
+        $this->assertArrayNotHasKey('expiration_date', $array);
     }
 
     public function testSearchMethodEnum(): void

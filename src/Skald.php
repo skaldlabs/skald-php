@@ -16,6 +16,7 @@ use Skald\Types\GenerateDocStreamEvent;
 use Skald\Types\MemoData;
 use Skald\Types\SearchRequest;
 use Skald\Types\SearchResponse;
+use Skald\Types\UpdateMemoData;
 
 /**
  * Skald API Client for PHP.
@@ -75,6 +76,23 @@ final class Skald
     public function createMemo(MemoData $memoData): CreateMemoResponse
     {
         $response = $this->post('/api/v1/memo', $memoData->toArray());
+        return CreateMemoResponse::fromArray($response);
+    }
+
+    /**
+     * Update an existing memo.
+     *
+     * All fields are optional. When content is updated, the memo is automatically
+     * reprocessed (summary, tags, and chunks are regenerated).
+     *
+     * @param string $memoId The UUID of the memo to update
+     * @param UpdateMemoData $updateData The fields to update
+     * @return CreateMemoResponse
+     * @throws SkaldException
+     */
+    public function updateMemo(string $memoId, UpdateMemoData $updateData): CreateMemoResponse
+    {
+        $response = $this->patch("/api/v1/memo/{$memoId}", $updateData->toArray());
         return CreateMemoResponse::fromArray($response);
     }
 
@@ -182,6 +200,33 @@ final class Skald
      */
     private function post(string $endpoint, array $data): array
     {
+        return $this->request('POST', $endpoint, $data);
+    }
+
+    /**
+     * Make a PATCH request to the API.
+     *
+     * @param string $endpoint API endpoint path
+     * @param array<string, mixed> $data Request body data
+     * @return array<string, mixed>
+     * @throws SkaldException
+     */
+    private function patch(string $endpoint, array $data): array
+    {
+        return $this->request('PATCH', $endpoint, $data);
+    }
+
+    /**
+     * Make an HTTP request to the API.
+     *
+     * @param string $method HTTP method (POST, PATCH, etc.)
+     * @param string $endpoint API endpoint path
+     * @param array<string, mixed> $data Request body data
+     * @return array<string, mixed>
+     * @throws SkaldException
+     */
+    private function request(string $method, string $endpoint, array $data): array
+    {
         $url = $this->baseUrl . $endpoint;
         $jsonData = json_encode($data);
 
@@ -195,7 +240,7 @@ final class Skald
         }
 
         curl_setopt_array($ch, [
-            CURLOPT_POST => true,
+            CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_POSTFIELDS => $jsonData,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => [
