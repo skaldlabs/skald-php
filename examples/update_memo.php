@@ -20,7 +20,7 @@ echo "=== Skald PHP SDK - Update Memo Examples ===\n\n";
 
 // You'll need to replace this with an actual memo UUID from your account
 // You can create one using create_memo.php first
-$memoId = 'your-memo-uuid-here';
+$memoId = '4db6bd34-7e64-4ee5-ab23-1c1e187931d6';
 
 echo "Note: Replace '\$memoId' in this script with an actual memo UUID from your account.\n\n";
 
@@ -143,7 +143,7 @@ echo "Example 6: Update by Reference ID\n";
 echo "----------------------------------\n";
 echo "You can update a memo using your own reference ID instead of the Skald UUID.\n\n";
 
-$clientRefId = 'your-reference-id-here';
+$clientRefId = 'confluence_page_xyz789';
 
 try {
     $result = $skald->updateMemo($clientRefId, new UpdateMemoData(
@@ -180,4 +180,3 @@ echo "2. Updating 'content' triggers automatic reprocessing\n";
 echo "3. Updating other fields preserves existing AI-generated data\n";
 echo "4. Perfect for incremental updates and metadata tracking\n";
 echo "5. Use reference_id to update memos by your own IDs\n";
-echo "6. Include project_id when using Token Authentication\n";

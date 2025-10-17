@@ -8,19 +8,16 @@ namespace Skald\Types;
  * Request parameters for chat operations.
  *
  * @property string $query Required. The question to ask
- * @property string|null $project_id Optional. Project UUID (required with Token Authentication)
  * @property Filter[]|null $filters Optional. Array of filters to narrow context
  */
 final class ChatRequest
 {
     /**
      * @param string $query
-     * @param string|null $project_id
      * @param Filter[]|null $filters
      */
     public function __construct(
         public readonly string $query,
-        public readonly ?string $project_id = null,
         public readonly ?array $filters = null
     ) {
     }
@@ -38,9 +35,6 @@ final class ChatRequest
             'stream' => $stream,
         ];
 
-        if ($this->project_id !== null) {
-            $data['project_id'] = $this->project_id;
-        }
 
         if ($this->filters !== null) {
             $data['filters'] = array_map(fn($filter) => $filter->toArray(), $this->filters);

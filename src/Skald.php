@@ -96,7 +96,6 @@ final class Skald
         string $memoId,
         UpdateMemoData $updateData,
         string $idType = 'memo_uuid',
-        ?string $projectId = null
     ): CreateMemoResponse {
         $queryParams = [];
 
@@ -104,9 +103,6 @@ final class Skald
             $queryParams['id_type'] = $idType;
         }
 
-        if ($projectId !== null) {
-            $queryParams['project_id'] = $projectId;
-        }
 
         $endpoint = "/api/v1/memo/{$memoId}";
         if (!empty($queryParams)) {
@@ -122,23 +118,17 @@ final class Skald
      *
      * @param string $memoId The UUID or client reference ID of the memo to delete
      * @param string $idType Type of identifier: 'memo_uuid' or 'reference_id' (default: 'memo_uuid')
-     * @param string|null $projectId Project UUID (required when using Token Authentication)
      * @return void
      * @throws SkaldException
      */
     public function deleteMemo(
         string $memoId,
         string $idType = 'memo_uuid',
-        ?string $projectId = null
     ): void {
         $queryParams = [];
 
         if ($idType !== 'memo_uuid') {
             $queryParams['id_type'] = $idType;
-        }
-
-        if ($projectId !== null) {
-            $queryParams['project_id'] = $projectId;
         }
 
         $endpoint = "/api/v1/memo/{$memoId}";

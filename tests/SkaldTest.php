@@ -496,26 +496,6 @@ class SkaldTest extends TestCase
         $this->assertEquals('PATCH', $request['method']);
     }
 
-    public function testUpdateMemoWithProjectId(): void
-    {
-        $this->mockServer->queueResponse(200, ['ok' => true]);
-
-        $updateData = new UpdateMemoData(
-            title: 'Updated with Project ID'
-        );
-
-        $response = $this->client->updateMemo(
-            'memo-uuid',
-            $updateData,
-            'memo_uuid',
-            'project-uuid-123'
-        );
-
-        $this->assertTrue($response->ok);
-
-        $request = $this->mockServer->getLastRequest();
-        $this->assertStringContainsString('project_id=project-uuid-123', $request['path']);
-    }
 
     public function testUpdateMemoWithReferenceIdAndProjectId(): void
     {
@@ -529,14 +509,12 @@ class SkaldTest extends TestCase
             'external-ref-456',
             $updateData,
             'reference_id',
-            'project-uuid-789'
         );
 
         $this->assertTrue($response->ok);
 
         $request = $this->mockServer->getLastRequest();
         $this->assertStringContainsString('id_type=reference_id', $request['path']);
-        $this->assertStringContainsString('project_id=project-uuid-789', $request['path']);
         $this->assertStringContainsString('/api/v1/memo/external-ref-456', $request['path']);
     }
 
@@ -564,16 +542,6 @@ class SkaldTest extends TestCase
         $this->assertEquals('DELETE', $request['method']);
     }
 
-    public function testDeleteMemoWithProjectId(): void
-    {
-        $this->mockServer->queueResponse(204, null);
-
-        $this->client->deleteMemo('memo-uuid', 'memo_uuid', 'project-uuid-123');
-
-        $request = $this->mockServer->getLastRequest();
-        $this->assertStringContainsString('project_id=project-uuid-123', $request['path']);
-        $this->assertEquals('DELETE', $request['method']);
-    }
 
     public function testDeleteMemoWithReferenceIdAndProjectId(): void
     {
@@ -583,7 +551,6 @@ class SkaldTest extends TestCase
 
         $request = $this->mockServer->getLastRequest();
         $this->assertStringContainsString('id_type=reference_id', $request['path']);
-        $this->assertStringContainsString('project_id=project-uuid-456', $request['path']);
         $this->assertStringContainsString('/api/v1/memo/external-ref-789', $request['path']);
     }
 
@@ -654,12 +621,10 @@ class SkaldTest extends TestCase
     {
         $request = new ChatRequest(
             query: 'Test query',
-            project_id: 'proj123'
         );
 
         $array = $request->toArray(false);
         $this->assertEquals('Test query', $array['query']);
-        $this->assertEquals('proj123', $array['project_id']);
         $this->assertFalse($array['stream']);
 
         $streamArray = $request->toArray(true);
@@ -671,13 +636,11 @@ class SkaldTest extends TestCase
         $request = new GenerateDocRequest(
             prompt: 'Test prompt',
             rules: 'Test rules',
-            project_id: 'proj123'
         );
 
         $array = $request->toArray(false);
         $this->assertEquals('Test prompt', $array['prompt']);
         $this->assertEquals('Test rules', $array['rules']);
-        $this->assertEquals('proj123', $array['project_id']);
         $this->assertFalse($array['stream']);
     }
 

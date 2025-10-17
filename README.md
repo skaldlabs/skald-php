@@ -276,7 +276,6 @@ $response = $skald->chat(ChatRequest $chatParams): ChatResponse;
 ```php
 new ChatRequest(
     query: string,              // Required - question to ask
-    project_id: ?string = null  // Optional - project UUID
 );
 ```
 
@@ -329,7 +328,6 @@ $response = $skald->generateDoc(GenerateDocRequest $generateParams): GenerateDoc
 new GenerateDocRequest(
     prompt: string,             // Required - document generation prompt
     rules: ?string = null,      // Optional - style/format rules
-    project_id: ?string = null  // Optional - project UUID
 );
 ```
 
@@ -429,12 +427,10 @@ enum SearchMethod: string
 
 #### ChatRequest
 - `query: string` - Question to ask
-- `project_id: ?string` - Project UUID (for token auth)
 
 #### GenerateDocRequest
 - `prompt: string` - Document generation prompt
 - `rules: ?string` - Style/format guidelines
-- `project_id: ?string` - Project UUID (for token auth)
 
 ### Response Types
 

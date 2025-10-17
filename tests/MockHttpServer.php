@@ -145,7 +145,7 @@ PHP;
         usleep(500000); // 500ms
     }
 
-    public function queueResponse(int $statusCode, array $data): void
+    public function queueResponse(int $statusCode, ?array $data): void
     {
         $responsesFile = self::$tempDir . '/responses.json';
         $responses = json_decode(@file_get_contents($responsesFile), true) ?: [];
