@@ -242,18 +242,21 @@ new SearchRequest(
     query: string,                  // Required - search query
     searchMethod: SearchMethod,     // Required - search method
     limit: ?int = null,            // Optional - results limit (1-50, default 10)
-    tags: ?array = null            // Optional - filter by tags
+    filters: ?array = null         // Optional - array of Filter objects
 );
 ```
 
 **Example:**
 
 ```php
+use Skald\Types\Filter;
+use Skald\Types\FilterOperator;
+
+// Basic search
 $results = $skald->search(new SearchRequest(
     query: 'product requirements',
     searchMethod: SearchMethod::CHUNK_VECTOR_SEARCH,
-    limit: 5,
-    tags: ['product']
+    limit: 5
 ));
 
 foreach ($results->results as $result) {
@@ -263,6 +266,17 @@ foreach ($results->results as $result) {
     echo "Snippet: {$result->content_snippet}\n";
     echo "Distance: {$result->distance}\n\n"; // Lower = more relevant
 }
+
+// Search with filters
+$results = $skald->search(new SearchRequest(
+    query: 'product requirements',
+    searchMethod: SearchMethod::CHUNK_VECTOR_SEARCH,
+    limit: 5,
+    filters: [
+        Filter::nativeField('tags', FilterOperator::IN, ['product', 'requirements']),
+        Filter::nativeField('source', FilterOperator::EQ, 'confluence')
+    ]
+));
 ```
 
 ### AI Chat (Non-Streaming)
@@ -423,7 +437,7 @@ enum SearchMethod: string
 - `query: string` - Search query
 - `searchMethod: SearchMethod` - Search method to use
 - `limit: ?int` - Results limit (1-50, default 10)
-- `tags: ?array` - Filter by tags
+- `filters: ?array` - Array of Filter objects to narrow results
 
 #### ChatRequest
 - `query: string` - Question to ask

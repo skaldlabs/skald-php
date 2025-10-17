@@ -10,7 +10,6 @@ namespace Skald\Types;
  * @property string $query Required. The search query
  * @property SearchMethod $search_method Required. The search method to use
  * @property int|null $limit Optional. Results limit (1-50, default 10)
- * @property string[]|null $tags Optional. Filter by tags
  * @property Filter[]|null $filters Optional. Array of filters to narrow results
  */
 final class SearchRequest
@@ -19,14 +18,12 @@ final class SearchRequest
      * @param string $query
      * @param SearchMethod $searchMethod
      * @param int|null $limit
-     * @param string[]|null $tags
      * @param Filter[]|null $filters
      */
     public function __construct(
         public readonly string $query,
         public readonly SearchMethod $searchMethod,
         public readonly ?int $limit = null,
-        public readonly ?array $tags = null,
         public readonly ?array $filters = null
     ) {
     }
@@ -45,10 +42,6 @@ final class SearchRequest
 
         if ($this->limit !== null) {
             $data['limit'] = $this->limit;
-        }
-
-        if ($this->tags !== null) {
-            $data['tags'] = $this->tags;
         }
 
         if ($this->filters !== null) {
