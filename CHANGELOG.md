@@ -9,15 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `updateMemo()` method to update existing memos via PATCH /api/v1/memo/{memo_id}
+- `deleteMemo()` method to delete memos via DELETE /api/v1/memo/{memo_id}
 - `UpdateMemoData` type class for type-safe memo updates with all optional fields
 - Support for partial memo updates (title, content, metadata, client_reference_id, source, expiration_date)
+- Support for updating and deleting memos by `reference_id` instead of just UUID via `id_type` parameter
+- Support for `project_id` parameter in update and delete operations (for Token Authentication)
 - Automatic reprocessing when memo content is updated
 - Generic `request()` method for improved HTTP request handling
+- `delete()` method for DELETE requests
 
 ### Changed
 - Refactored HTTP request handling in Skald client to support multiple HTTP methods
 - Simplified `post()` method to use shared `request()` implementation
 - Added new `patch()` method for PATCH requests
+- Enhanced `updateMemo()` to accept `id_type` and `project_id` parameters
 
 ## [0.1.0] - 2025-01-XX
 

@@ -476,6 +476,171 @@ class SkaldTest extends TestCase
         $this->assertArrayNotHasKey('expiration_date', $array);
     }
 
+    public function testUpdateMemoWithReferenceId(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'Updated via Reference ID'
+        );
+
+        $response = $this->client->updateMemo('external-ref-123', $updateData, 'reference_id');
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('id_type=reference_id', $request['path']);
+        $this->assertStringContainsString('/api/v1/memo/external-ref-123', $request['path']);
+        $this->assertEquals('PATCH', $request['method']);
+    }
+
+    public function testUpdateMemoWithProjectId(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            title: 'Updated with Project ID'
+        );
+
+        $response = $this->client->updateMemo(
+            'memo-uuid',
+            $updateData,
+            'memo_uuid',
+            'project-uuid-123'
+        );
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('project_id=project-uuid-123', $request['path']);
+    }
+
+    public function testUpdateMemoWithReferenceIdAndProjectId(): void
+    {
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $updateData = new UpdateMemoData(
+            content: 'New content'
+        );
+
+        $response = $this->client->updateMemo(
+            'external-ref-456',
+            $updateData,
+            'reference_id',
+            'project-uuid-789'
+        );
+
+        $this->assertTrue($response->ok);
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('id_type=reference_id', $request['path']);
+        $this->assertStringContainsString('project_id=project-uuid-789', $request['path']);
+        $this->assertStringContainsString('/api/v1/memo/external-ref-456', $request['path']);
+    }
+
+    public function testDeleteMemoSuccess(): void
+    {
+        $this->mockServer->queueResponse(204, null);
+
+        $this->client->deleteMemo('test-memo-uuid');
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertEquals('/api/v1/memo/test-memo-uuid', $request['path']);
+        $this->assertEquals('DELETE', $request['method']);
+        $this->assertStringContainsString('Bearer test_api_key', $request['headers']['Authorization']);
+    }
+
+    public function testDeleteMemoWithReferenceId(): void
+    {
+        $this->mockServer->queueResponse(204, null);
+
+        $this->client->deleteMemo('external-ref-123', 'reference_id');
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('id_type=reference_id', $request['path']);
+        $this->assertStringContainsString('/api/v1/memo/external-ref-123', $request['path']);
+        $this->assertEquals('DELETE', $request['method']);
+    }
+
+    public function testDeleteMemoWithProjectId(): void
+    {
+        $this->mockServer->queueResponse(204, null);
+
+        $this->client->deleteMemo('memo-uuid', 'memo_uuid', 'project-uuid-123');
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('project_id=project-uuid-123', $request['path']);
+        $this->assertEquals('DELETE', $request['method']);
+    }
+
+    public function testDeleteMemoWithReferenceIdAndProjectId(): void
+    {
+        $this->mockServer->queueResponse(204, null);
+
+        $this->client->deleteMemo('external-ref-789', 'reference_id', 'project-uuid-456');
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('id_type=reference_id', $request['path']);
+        $this->assertStringContainsString('project_id=project-uuid-456', $request['path']);
+        $this->assertStringContainsString('/api/v1/memo/external-ref-789', $request['path']);
+    }
+
+    public function testDeleteMemoNotFound(): void
+    {
+        $mockErrorResponse = [
+            'error' => 'Memo not found',
+        ];
+
+        $this->mockServer->queueResponse(404, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(404\):/');
+
+        $this->client->deleteMemo('non-existent-uuid');
+    }
+
+    public function testDeleteMemoAccessDenied(): void
+    {
+        $mockErrorResponse = [
+            'error' => 'Access denied',
+        ];
+
+        $this->mockServer->queueResponse(403, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(403\):/');
+
+        $this->client->deleteMemo('forbidden-uuid');
+    }
+
+    public function testUpdateMemoInvalidIdType(): void
+    {
+        $mockErrorResponse = [
+            'error' => "id_type must be either 'memo_uuid' or 'reference_id'",
+        ];
+
+        $this->mockServer->queueResponse(400, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(400\):/');
+
+        $this->client->updateMemo('memo-id', new UpdateMemoData(title: 'Test'), 'invalid_type');
+    }
+
+    public function testDeleteMemoInvalidIdType(): void
+    {
+        $mockErrorResponse = [
+            'error' => "id_type must be either 'memo_uuid' or 'reference_id'",
+        ];
+
+        $this->mockServer->queueResponse(400, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(400\):/');
+
+        $this->client->deleteMemo('memo-id', 'invalid_type');
+    }
+
     public function testSearchMethodEnum(): void
     {
         $this->assertEquals('chunk_vector_search', SearchMethod::CHUNK_VECTOR_SEARCH->value);

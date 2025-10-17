@@ -138,9 +138,46 @@ try {
     echo "✗ Error: {$e->getMessage()}\n\n";
 }
 
+// Example 6: Update by client reference ID instead of UUID
+echo "Example 6: Update by Reference ID\n";
+echo "----------------------------------\n";
+echo "You can update a memo using your own reference ID instead of the Skald UUID.\n\n";
+
+$clientRefId = 'your-reference-id-here';
+
+try {
+    $result = $skald->updateMemo($clientRefId, new UpdateMemoData(
+        title: 'Updated via Reference ID',
+        metadata: ['updated_by_ref_id' => true]
+    ), 'reference_id');
+
+    echo "✓ Memo updated via reference ID successfully!\n";
+    echo "  Status: " . ($result->ok ? 'OK' : 'FAILED') . "\n\n";
+} catch (SkaldException $e) {
+    echo "✗ Error: {$e->getMessage()}\n\n";
+}
+
+// Example 7: Update with project ID (Token Authentication)
+echo "Example 7: Update with Project ID\n";
+echo "----------------------------------\n";
+echo "When using Token Authentication, you need to provide the project ID.\n\n";
+
+try {
+    $result = $skald->updateMemo($memoId, new UpdateMemoData(
+        title: 'Updated with Project Context'
+    ), 'memo_uuid', 'your-project-uuid-here');
+
+    echo "✓ Memo updated with project ID successfully!\n";
+    echo "  Status: " . ($result->ok ? 'OK' : 'FAILED') . "\n\n";
+} catch (SkaldException $e) {
+    echo "✗ Error: {$e->getMessage()}\n\n";
+}
+
 echo "=== Examples Complete ===\n\n";
 echo "Key Takeaways:\n";
 echo "1. All fields are optional - update only what you need\n";
 echo "2. Updating 'content' triggers automatic reprocessing\n";
 echo "3. Updating other fields preserves existing AI-generated data\n";
 echo "4. Perfect for incremental updates and metadata tracking\n";
+echo "5. Use reference_id to update memos by your own IDs\n";
+echo "6. Include project_id when using Token Authentication\n";

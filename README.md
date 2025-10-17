@@ -120,7 +120,12 @@ $result = $skald->createMemo(new MemoData(
 ### Updating Memos
 
 ```php
-$response = $skald->updateMemo(string $memoId, UpdateMemoData $updateData): CreateMemoResponse;
+$response = $skald->updateMemo(
+    string $memoId,
+    UpdateMemoData $updateData,
+    string $idType = 'memo_uuid',
+    ?string $projectId = null
+): CreateMemoResponse;
 ```
 
 Update an existing memo with partial or complete changes. All fields are optional - only include the fields you want to update.
@@ -128,6 +133,11 @@ Update an existing memo with partial or complete changes. All fields are optiona
 **Important**: When `content` is updated, the memo is automatically reprocessed by the API (summary, tags, and chunks are regenerated). Other field updates preserve existing processing results.
 
 **Parameters:**
+
+- `$memoId` (string): The memo UUID or client reference ID
+- `$updateData` (UpdateMemoData): The fields to update
+- `$idType` (string, optional): Type of identifier - `'memo_uuid'` (default) or `'reference_id'`
+- `$projectId` (string|null, optional): Project UUID (required when using Token Authentication)
 
 ```php
 new UpdateMemoData(
@@ -145,10 +155,20 @@ new UpdateMemoData(
 ```php
 use Skald\Types\UpdateMemoData;
 
-// Update only the title
+// Update by memo UUID (default)
 $skald->updateMemo('memo-uuid-here', new UpdateMemoData(
     title: 'Updated Title'
 ));
+
+// Update by client reference ID
+$skald->updateMemo('external-id-123', new UpdateMemoData(
+    title: 'Updated via Reference ID'
+), 'reference_id');
+
+// Update with project ID (for Token Authentication)
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    content: 'New content'
+), 'memo_uuid', 'project-uuid-123');
 
 // Update content (triggers automatic reprocessing)
 $skald->updateMemo('memo-uuid-here', new UpdateMemoData(
@@ -167,6 +187,40 @@ $skald->updateMemo('memo-uuid-here', new UpdateMemoData(
 $skald->updateMemo('memo-uuid-here', new UpdateMemoData(
     metadata: ['last_viewed' => time(), 'view_count' => 42]
 ));
+```
+
+### Deleting Memos
+
+```php
+$skald->deleteMemo(
+    string $memoId,
+    string $idType = 'memo_uuid',
+    ?string $projectId = null
+): void;
+```
+
+Delete a memo and all its associated data (content, summary, tags, chunks).
+
+**Parameters:**
+
+- `$memoId` (string): The memo UUID or client reference ID
+- `$idType` (string, optional): Type of identifier - `'memo_uuid'` (default) or `'reference_id'`
+- `$projectId` (string|null, optional): Project UUID (required when using Token Authentication)
+
+**Examples:**
+
+```php
+// Delete by memo UUID (default)
+$skald->deleteMemo('memo-uuid-here');
+
+// Delete by client reference ID
+$skald->deleteMemo('external-id-123', 'reference_id');
+
+// Delete with project ID (for Token Authentication)
+$skald->deleteMemo('memo-uuid-here', 'memo_uuid', 'project-uuid-123');
+
+// Delete by reference ID with project ID
+$skald->deleteMemo('external-id-456', 'reference_id', 'project-uuid-789');
 ```
 
 ### Searching Memos
@@ -420,7 +474,8 @@ enum SearchMethod: string
 See the `examples/` directory for complete working examples:
 
 - `create_memo.php` - Creating memos with various options
-- `update_memo.php` - Updating existing memos
+- `update_memo.php` - Updating existing memos (including by reference ID)
+- `delete_memo.php` - Deleting memos (by UUID or reference ID)
 - `search.php` - All search methods with examples
 - `chat.php` - Non-streaming chat
 - `chat_streaming.php` - Streaming chat with real-time output

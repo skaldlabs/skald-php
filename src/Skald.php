@@ -85,15 +85,68 @@ final class Skald
      * All fields are optional. When content is updated, the memo is automatically
      * reprocessed (summary, tags, and chunks are regenerated).
      *
-     * @param string $memoId The UUID of the memo to update
+     * @param string $memoId The UUID or client reference ID of the memo to update
      * @param UpdateMemoData $updateData The fields to update
+     * @param string $idType Type of identifier: 'memo_uuid' or 'reference_id' (default: 'memo_uuid')
+     * @param string|null $projectId Project UUID (required when using Token Authentication)
      * @return CreateMemoResponse
      * @throws SkaldException
      */
-    public function updateMemo(string $memoId, UpdateMemoData $updateData): CreateMemoResponse
-    {
-        $response = $this->patch("/api/v1/memo/{$memoId}", $updateData->toArray());
+    public function updateMemo(
+        string $memoId,
+        UpdateMemoData $updateData,
+        string $idType = 'memo_uuid',
+        ?string $projectId = null
+    ): CreateMemoResponse {
+        $queryParams = [];
+
+        if ($idType !== 'memo_uuid') {
+            $queryParams['id_type'] = $idType;
+        }
+
+        if ($projectId !== null) {
+            $queryParams['project_id'] = $projectId;
+        }
+
+        $endpoint = "/api/v1/memo/{$memoId}";
+        if (!empty($queryParams)) {
+            $endpoint .= '?' . http_build_query($queryParams);
+        }
+
+        $response = $this->patch($endpoint, $updateData->toArray());
         return CreateMemoResponse::fromArray($response);
+    }
+
+    /**
+     * Delete a memo and all its associated data.
+     *
+     * @param string $memoId The UUID or client reference ID of the memo to delete
+     * @param string $idType Type of identifier: 'memo_uuid' or 'reference_id' (default: 'memo_uuid')
+     * @param string|null $projectId Project UUID (required when using Token Authentication)
+     * @return void
+     * @throws SkaldException
+     */
+    public function deleteMemo(
+        string $memoId,
+        string $idType = 'memo_uuid',
+        ?string $projectId = null
+    ): void {
+        $queryParams = [];
+
+        if ($idType !== 'memo_uuid') {
+            $queryParams['id_type'] = $idType;
+        }
+
+        if ($projectId !== null) {
+            $queryParams['project_id'] = $projectId;
+        }
+
+        $endpoint = "/api/v1/memo/{$memoId}";
+        if (!empty($queryParams)) {
+            $endpoint .= '?' . http_build_query($queryParams);
+        }
+
+        $this->delete($endpoint);
     }
 
     /**
@@ -214,6 +267,45 @@ final class Skald
     private function patch(string $endpoint, array $data): array
     {
         return $this->request('PATCH', $endpoint, $data);
+    }
+
+    /**
+     * Make a DELETE request to the API.
+     *
+     * @param string $endpoint API endpoint path
+     * @return void
+     * @throws SkaldException
+     */
+    private function delete(string $endpoint): void
+    {
+        $url = $this->baseUrl . $endpoint;
+
+        $ch = curl_init($url);
+        if ($ch === false) {
+            throw new SkaldException('Failed to initialize cURL');
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST => 'DELETE',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->apiKey,
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false) {
+            throw new SkaldException('cURL request failed: ' . $error);
+        }
+
+        // DELETE returns 204 No Content on success
+        if ($httpCode >= 400) {
+            throw SkaldException::fromApiError($httpCode, (string)$response);
+        }
     }
 
     /**
