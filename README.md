@@ -117,6 +117,58 @@ $result = $skald->createMemo(new MemoData(
 // Returns: CreateMemoResponse { ok: true }
 ```
 
+### Updating Memos
+
+```php
+$response = $skald->updateMemo(string $memoId, UpdateMemoData $updateData): CreateMemoResponse;
+```
+
+Update an existing memo with partial or complete changes. All fields are optional - only include the fields you want to update.
+
+**Important**: When `content` is updated, the memo is automatically reprocessed by the API (summary, tags, and chunks are regenerated). Other field updates preserve existing processing results.
+
+**Parameters:**
+
+```php
+new UpdateMemoData(
+    title: ?string = null,                  // Optional - memo title (max 255 chars)
+    content: ?string = null,                // Optional - memo content (triggers reprocessing)
+    metadata: ?array = null,                // Optional - custom JSON metadata
+    client_reference_id: ?string = null,    // Optional - external ID mapping (max 255 chars)
+    source: ?string = null,                 // Optional - source system (max 255 chars)
+    expiration_date: ?string = null         // Optional - expiration date (ISO 8601 format)
+);
+```
+
+**Examples:**
+
+```php
+use Skald\Types\UpdateMemoData;
+
+// Update only the title
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    title: 'Updated Title'
+));
+
+// Update content (triggers automatic reprocessing)
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    content: 'New content - this will regenerate summary, tags, and chunks'
+));
+
+// Update multiple fields
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    title: 'Updated Title',
+    metadata: ['updated_at' => time(), 'editor' => 'Jane'],
+    source: 'notion',
+    expiration_date: '2025-12-31T23:59:59Z'
+));
+
+// Update metadata without triggering reprocessing
+$skald->updateMemo('memo-uuid-here', new UpdateMemoData(
+    metadata: ['last_viewed' => time(), 'view_count' => 42]
+));
+```
+
 ### Searching Memos
 
 ```php
@@ -307,6 +359,14 @@ enum SearchMethod: string
 - `tags: ?array` - Array of tag strings
 - `source: ?string` - Source system identifier
 
+#### UpdateMemoData
+- `title: ?string` - Memo title (max 255 characters)
+- `content: ?string` - Memo content (triggers reprocessing when updated)
+- `metadata: ?array` - Custom metadata
+- `client_reference_id: ?string` - External reference ID (max 255 characters)
+- `source: ?string` - Source system identifier (max 255 characters)
+- `expiration_date: ?string` - Expiration date in ISO 8601 format
+
 #### SearchRequest
 - `query: string` - Search query
 - `searchMethod: SearchMethod` - Search method to use
@@ -360,6 +420,7 @@ enum SearchMethod: string
 See the `examples/` directory for complete working examples:
 
 - `create_memo.php` - Creating memos with various options
+- `update_memo.php` - Updating existing memos
 - `search.php` - All search methods with examples
 - `chat.php` - Non-streaming chat
 - `chat_streaming.php` - Streaming chat with real-time output
