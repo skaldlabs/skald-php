@@ -8,6 +8,8 @@ Official PHP SDK for [Skald API](https://useskald.com) - A knowledge base manage
 ## Features
 
 - **Memo Management**: Create and store memos with automatic processing (summarization, chunking, indexing)
+- **File Upload**: Upload documents (PDF, DOC, DOCX, PPTX up to 100MB) for automatic processing
+- **Status Tracking**: Check memo processing status to know when documents are ready
 - **Semantic Search**: Search through your knowledge base using vector search or title matching
 - **AI Chat**: Ask questions about your knowledge base with AI-powered responses and inline citations
 - **Document Generation**: Generate documents based on prompts with context from your knowledge base
@@ -115,6 +117,116 @@ $result = $skald->createMemo(new MemoData(
 ));
 
 // Returns: CreateMemoResponse { ok: true }
+```
+
+### Uploading Files
+
+```php
+$response = $skald->createMemoFromFile(
+    string $filePath,
+    ?MemoFileData $memoData = null
+): CreateMemoResponse;
+```
+
+Upload a document file (PDF, DOC, DOCX, PPTX, up to 100MB) that will be automatically processed by the Skald API.
+
+**Parameters:**
+
+- `$filePath` (string): Path to the file to upload
+- `$memoData` (MemoFileData|null, optional): Optional metadata for the memo
+
+```php
+new MemoFileData(
+    title: ?string = null,           // Optional - memo title (extracted from file if not provided)
+    metadata: ?array = null,         // Optional - custom JSON metadata
+    reference_id: ?string = null,    // Optional - external ID mapping
+    tags: ?array = null,            // Optional - array of tags
+    source: ?string = null          // Optional - source system (e.g., "google-drive")
+);
+```
+
+**Example:**
+
+```php
+use Skald\Types\MemoFileData;
+
+// Upload with metadata
+$result = $skald->createMemoFromFile(
+    '/path/to/document.pdf',
+    new MemoFileData(
+        title: 'Q1 Planning Document',
+        metadata: ['department' => 'Engineering'],
+        tags: ['planning', 'quarterly'],
+        source: 'google-drive',
+        reference_id: 'gdrive-doc-12345'
+    )
+);
+
+// Upload without metadata (title will be extracted from file)
+$result = $skald->createMemoFromFile('/path/to/document.pdf');
+
+// Returns: CreateMemoResponse { ok: true }
+```
+
+### Checking Memo Status
+
+```php
+$response = $skald->checkMemoStatus(
+    string $memoId,
+    string $idType = 'memo_uuid'
+): MemoStatusResponse;
+```
+
+Check the processing status of a memo to know when it's ready for search and chat.
+
+**Parameters:**
+
+- `$memoId` (string): The memo UUID or client reference ID
+- `$idType` (string, optional): Type of identifier - `'memo_uuid'` (default) or `'reference_id'`
+
+**Status Values:**
+
+- `processing` - Memo is being processed
+- `processed` - Memo is ready for search and chat
+- `error` - Processing failed
+
+**Example:**
+
+```php
+// Check status by memo UUID
+$status = $skald->checkMemoStatus('memo-uuid-here');
+
+echo "Status: {$status->status}\n";
+
+if ($status->isProcessing()) {
+    echo "Still processing...\n";
+} elseif ($status->isProcessed()) {
+    echo "Ready for search and chat!\n";
+} elseif ($status->isError()) {
+    echo "Processing failed: {$status->error_reason}\n";
+}
+
+// Check status by reference ID
+$status = $skald->checkMemoStatus('external-ref-123', 'reference_id');
+
+// Poll until processing is complete
+$maxAttempts = 30;
+$attempt = 0;
+
+while ($attempt < $maxAttempts) {
+    $status = $skald->checkMemoStatus('memo-uuid-here');
+
+    if ($status->isProcessed()) {
+        echo "Processing complete!\n";
+        break;
+    } elseif ($status->isError()) {
+        echo "Processing failed!\n";
+        break;
+    }
+
+    sleep(2); // Wait 2 seconds before checking again
+    $attempt++;
+}
 ```
 
 ### Updating Memos
@@ -425,6 +537,13 @@ enum SearchMethod: string
 - `tags: ?array` - Array of tag strings
 - `source: ?string` - Source system identifier
 
+#### MemoFileData
+- `title: ?string` - Memo title (max 255 characters, extracted from file if not provided)
+- `metadata: ?array` - Custom metadata
+- `reference_id: ?string` - External reference ID
+- `tags: ?array` - Array of tag strings
+- `source: ?string` - Source system identifier
+
 #### UpdateMemoData
 - `title: ?string` - Memo title (max 255 characters)
 - `content: ?string` - Memo content (triggers reprocessing when updated)
@@ -450,6 +569,14 @@ enum SearchMethod: string
 
 #### CreateMemoResponse
 - `ok: bool` - Success status
+
+#### MemoStatusResponse
+- `memo_uuid: string` - The UUID of the memo
+- `status: string` - Processing status ('processing', 'processed', or 'error')
+- `error_reason: ?string` - Reason for error if status is 'error'
+- `isProcessing(): bool` - Check if memo is still processing
+- `isProcessed(): bool` - Check if memo has been processed
+- `isError(): bool` - Check if memo processing failed
 
 #### SearchResponse
 - `results: SearchResult[]` - Array of search results
@@ -484,6 +611,8 @@ enum SearchMethod: string
 See the `examples/` directory for complete working examples:
 
 - `create_memo.php` - Creating memos with various options
+- `upload_file.php` - Uploading documents (PDF, DOC, DOCX, PPTX)
+- `check_memo_status.php` - Checking memo processing status with polling
 - `update_memo.php` - Updating existing memos (including by reference ID)
 - `delete_memo.php` - Deleting memos (by UUID or reference ID)
 - `search.php` - All search methods with examples
