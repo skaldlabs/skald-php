@@ -12,6 +12,7 @@ use Skald\Types\Filter;
 use Skald\Types\FilterOperator;
 use Skald\Types\GenerateDocRequest;
 use Skald\Types\MemoData;
+use Skald\Types\MemoFileData;
 use Skald\Types\SearchMethod;
 use Skald\Types\SearchRequest;
 use Skald\Types\UpdateMemoData;
@@ -751,5 +752,192 @@ class SkaldTest extends TestCase
         $body = json_decode($request['body'], true);
         $this->assertArrayHasKey('filters', $body);
         $this->assertCount(1, $body['filters']);
+    }
+
+    public function testCreateMemoFromFileSuccess(): void
+    {
+        // Create a temporary test file
+        $tempFile = sys_get_temp_dir() . '/test-memo-' . uniqid() . '.txt';
+        file_put_contents($tempFile, 'This is test content for file upload.');
+
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        $memoData = new MemoFileData(
+            title: 'Test File Upload',
+            metadata: ['test' => true],
+            tags: ['test', 'upload'],
+            source: 'phpunit'
+        );
+
+        try {
+            $response = $this->client->createMemoFromFile($tempFile, $memoData);
+
+            $this->assertTrue($response->ok);
+
+            $request = $this->mockServer->getLastRequest();
+            $this->assertEquals('/api/v1/memo/upload', $request['path']);
+            $this->assertEquals('POST', $request['method']);
+            $this->assertStringContainsString('Bearer test_api_key', $request['headers']['Authorization']);
+            $this->assertStringContainsString('multipart/form-data', $request['headers']['Content-Type']);
+        } finally {
+            @unlink($tempFile);
+        }
+    }
+
+    public function testCreateMemoFromFileWithoutMetadata(): void
+    {
+        // Create a temporary test file
+        $tempFile = sys_get_temp_dir() . '/test-memo-minimal-' . uniqid() . '.txt';
+        file_put_contents($tempFile, 'Minimal test content.');
+
+        $this->mockServer->queueResponse(200, ['ok' => true]);
+
+        try {
+            $response = $this->client->createMemoFromFile($tempFile);
+
+            $this->assertTrue($response->ok);
+
+            $request = $this->mockServer->getLastRequest();
+            $this->assertEquals('/api/v1/memo/upload', $request['path']);
+            $this->assertEquals('POST', $request['method']);
+        } finally {
+            @unlink($tempFile);
+        }
+    }
+
+    public function testCreateMemoFromFileNotFound(): void
+    {
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessage('File not found');
+
+        $this->client->createMemoFromFile('/nonexistent/file.txt');
+    }
+
+    public function testCheckMemoStatusProcessing(): void
+    {
+        $mockResponse = [
+            'memo_uuid' => 'test-uuid-123',
+            'status' => 'processing',
+        ];
+
+        $this->mockServer->queueResponse(200, $mockResponse);
+
+        $response = $this->client->checkMemoStatus('test-uuid-123');
+
+        $this->assertEquals('test-uuid-123', $response->memo_uuid);
+        $this->assertEquals('processing', $response->status);
+        $this->assertTrue($response->isProcessing());
+        $this->assertFalse($response->isProcessed());
+        $this->assertFalse($response->isError());
+        $this->assertNull($response->error_reason);
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertEquals('/api/v1/memo/test-uuid-123/status', $request['path']);
+        $this->assertEquals('GET', $request['method']);
+        $this->assertStringContainsString('Bearer test_api_key', $request['headers']['Authorization']);
+    }
+
+    public function testCheckMemoStatusProcessed(): void
+    {
+        $mockResponse = [
+            'memo_uuid' => 'test-uuid-456',
+            'status' => 'processed',
+        ];
+
+        $this->mockServer->queueResponse(200, $mockResponse);
+
+        $response = $this->client->checkMemoStatus('test-uuid-456');
+
+        $this->assertEquals('test-uuid-456', $response->memo_uuid);
+        $this->assertEquals('processed', $response->status);
+        $this->assertFalse($response->isProcessing());
+        $this->assertTrue($response->isProcessed());
+        $this->assertFalse($response->isError());
+    }
+
+    public function testCheckMemoStatusError(): void
+    {
+        $mockResponse = [
+            'memo_uuid' => 'test-uuid-789',
+            'status' => 'error',
+            'error_reason' => 'File format not supported',
+        ];
+
+        $this->mockServer->queueResponse(200, $mockResponse);
+
+        $response = $this->client->checkMemoStatus('test-uuid-789');
+
+        $this->assertEquals('test-uuid-789', $response->memo_uuid);
+        $this->assertEquals('error', $response->status);
+        $this->assertFalse($response->isProcessing());
+        $this->assertFalse($response->isProcessed());
+        $this->assertTrue($response->isError());
+        $this->assertEquals('File format not supported', $response->error_reason);
+    }
+
+    public function testCheckMemoStatusWithReferenceId(): void
+    {
+        $mockResponse = [
+            'memo_uuid' => 'test-uuid-abc',
+            'status' => 'processed',
+        ];
+
+        $this->mockServer->queueResponse(200, $mockResponse);
+
+        $response = $this->client->checkMemoStatus('external-ref-123', 'reference_id');
+
+        $this->assertEquals('test-uuid-abc', $response->memo_uuid);
+        $this->assertTrue($response->isProcessed());
+
+        $request = $this->mockServer->getLastRequest();
+        $this->assertStringContainsString('id_type=reference_id', $request['path']);
+        $this->assertStringContainsString('/api/v1/memo/external-ref-123/status', $request['path']);
+    }
+
+    public function testCheckMemoStatusNotFound(): void
+    {
+        $mockErrorResponse = [
+            'error' => 'Memo not found',
+        ];
+
+        $this->mockServer->queueResponse(404, $mockErrorResponse);
+
+        $this->expectException(SkaldException::class);
+        $this->expectExceptionMessageMatches('/Skald API error \(404\):/');
+
+        $this->client->checkMemoStatus('non-existent-uuid');
+    }
+
+    public function testMemoFileDataToArray(): void
+    {
+        $fileData = new MemoFileData(
+            title: 'Test Title',
+            metadata: ['key' => 'value'],
+            reference_id: 'ref123',
+            tags: ['tag1', 'tag2'],
+            source: 'test'
+        );
+
+        $array = $fileData->toArray();
+
+        $this->assertEquals('Test Title', $array['title']);
+        $this->assertEquals(['key' => 'value'], $array['metadata']);
+        $this->assertEquals('ref123', $array['reference_id']);
+        $this->assertEquals(['tag1', 'tag2'], $array['tags']);
+        $this->assertEquals('test', $array['source']);
+    }
+
+    public function testMemoFileDataToArrayWithDefaults(): void
+    {
+        $fileData = new MemoFileData();
+
+        $array = $fileData->toArray();
+
+        $this->assertEmpty($array);
+        $this->assertArrayNotHasKey('title', $array);
+        $this->assertArrayNotHasKey('metadata', $array);
+        $this->assertArrayNotHasKey('reference_id', $array);
+        $this->assertArrayNotHasKey('tags', $array);
+        $this->assertArrayNotHasKey('source', $array);
     }
 }

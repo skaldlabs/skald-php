@@ -14,6 +14,8 @@ use Skald\Types\GenerateDocRequest;
 use Skald\Types\GenerateDocResponse;
 use Skald\Types\GenerateDocStreamEvent;
 use Skald\Types\MemoData;
+use Skald\Types\MemoFileData;
+use Skald\Types\MemoStatusResponse;
 use Skald\Types\SearchRequest;
 use Skald\Types\SearchResponse;
 use Skald\Types\UpdateMemoData;
@@ -77,6 +79,133 @@ final class Skald
     {
         $response = $this->post('/api/v1/memo', $memoData->toArray());
         return CreateMemoResponse::fromArray($response);
+    }
+
+    /**
+     * Create a memo from a file upload.
+     *
+     * Uploads a document file (PDF, DOC, DOCX, PPTX, up to 100MB) that will be
+     * automatically processed by the Skald API.
+     *
+     * @param string $filePath Path to the file to upload
+     * @param MemoFileData|null $memoData Optional metadata for the memo
+     * @return CreateMemoResponse
+     * @throws SkaldException
+     */
+    public function createMemoFromFile(string $filePath, ?MemoFileData $memoData = null): CreateMemoResponse
+    {
+        if (!file_exists($filePath)) {
+            throw new SkaldException("File not found: {$filePath}");
+        }
+
+        if (!is_readable($filePath)) {
+            throw new SkaldException("File is not readable: {$filePath}");
+        }
+
+        $fileSize = filesize($filePath);
+        if ($fileSize === false) {
+            throw new SkaldException("Unable to determine file size: {$filePath}");
+        }
+
+        // Check file size (100MB limit)
+        $maxSize = 100 * 1024 * 1024; // 100MB in bytes
+        if ($fileSize > $maxSize) {
+            throw new SkaldException("File size exceeds 100MB limit: {$filePath}");
+        }
+
+        $url = $this->baseUrl . '/api/v1/memo/upload';
+
+        // Prepare multipart form data
+        $boundary = '----WebKitFormBoundary' . md5(uniqid());
+        $postData = '';
+
+        // Add file
+        $fileName = basename($filePath);
+        $fileContents = file_get_contents($filePath);
+        if ($fileContents === false) {
+            throw new SkaldException("Unable to read file: {$filePath}");
+        }
+
+        $postData .= "--{$boundary}\r\n";
+        $postData .= "Content-Disposition: form-data; name=\"file\"; filename=\"{$fileName}\"\r\n";
+        $postData .= "Content-Type: application/octet-stream\r\n\r\n";
+        $postData .= $fileContents . "\r\n";
+
+        // Add metadata fields if provided
+        if ($memoData !== null) {
+            $metadata = $memoData->toArray();
+            foreach ($metadata as $key => $value) {
+                if (is_array($value)) {
+                    $value = json_encode($value);
+                }
+                $postData .= "--{$boundary}\r\n";
+                $postData .= "Content-Disposition: form-data; name=\"{$key}\"\r\n\r\n";
+                $postData .= $value . "\r\n";
+            }
+        }
+
+        $postData .= "--{$boundary}--\r\n";
+
+        // Send request
+        $ch = curl_init($url);
+        if ($ch === false) {
+            throw new SkaldException('Failed to initialize cURL');
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $postData,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: multipart/form-data; boundary=' . $boundary,
+                'Authorization: Bearer ' . $this->apiKey,
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false) {
+            throw new SkaldException('cURL request failed: ' . $error);
+        }
+
+        if ($httpCode >= 400) {
+            throw SkaldException::fromApiError($httpCode, (string)$response);
+        }
+
+        $decoded = json_decode((string)$response, true);
+        if (!is_array($decoded)) {
+            throw new SkaldException('Failed to decode API response as JSON');
+        }
+
+        return CreateMemoResponse::fromArray($decoded);
+    }
+
+    /**
+     * Check the processing status of a memo.
+     *
+     * @param string $memoId The UUID or client reference ID of the memo
+     * @param string $idType Type of identifier: 'memo_uuid' or 'reference_id' (default: 'memo_uuid')
+     * @return MemoStatusResponse
+     * @throws SkaldException
+     */
+    public function checkMemoStatus(string $memoId, string $idType = 'memo_uuid'): MemoStatusResponse
+    {
+        $queryParams = [];
+
+        if ($idType !== 'memo_uuid') {
+            $queryParams['id_type'] = $idType;
+        }
+
+        $endpoint = "/api/v1/memo/{$memoId}/status";
+        if (!empty($queryParams)) {
+            $endpoint .= '?' . http_build_query($queryParams);
+        }
+
+        $response = $this->get($endpoint);
+        return MemoStatusResponse::fromArray($response);
     }
 
     /**
@@ -231,6 +360,50 @@ final class Skald
     public function streamedGenerateDoc(GenerateDocRequest $generateParams): Generator
     {
         yield from $this->streamPost('/api/v1/generate', $generateParams->toArray(true), GenerateDocStreamEvent::class);
+    }
+
+    /**
+     * Make a GET request to the API.
+     *
+     * @param string $endpoint API endpoint path
+     * @return array<string, mixed>
+     * @throws SkaldException
+     */
+    private function get(string $endpoint): array
+    {
+        $url = $this->baseUrl . $endpoint;
+
+        $ch = curl_init($url);
+        if ($ch === false) {
+            throw new SkaldException('Failed to initialize cURL');
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->apiKey,
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false) {
+            throw new SkaldException('cURL request failed: ' . $error);
+        }
+
+        if ($httpCode >= 400) {
+            throw SkaldException::fromApiError($httpCode, (string)$response);
+        }
+
+        $decoded = json_decode((string)$response, true);
+        if (!is_array($decoded)) {
+            throw new SkaldException('Failed to decode API response as JSON');
+        }
+
+        return $decoded;
     }
 
     /**
