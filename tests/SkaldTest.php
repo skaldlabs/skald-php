@@ -53,7 +53,7 @@ class SkaldTest extends TestCase
 
     public function testCreateMemoSuccess(): void
     {
-        $this->mockServer->queueResponse(200, ['ok' => true]);
+        $this->mockServer->queueResponse(201, ['memo_uuid' => 'test-memo-uuid-123']);
 
         $memoData = new MemoData(
             title: 'Test Memo',
@@ -65,7 +65,7 @@ class SkaldTest extends TestCase
 
         $response = $this->client->createMemo($memoData);
 
-        $this->assertTrue($response->ok);
+        $this->assertEquals('test-memo-uuid-123', $response->memo_uuid);
 
         $request = $this->mockServer->getLastRequest();
         $this->assertEquals('/api/v1/memo', $request['path']);
@@ -75,7 +75,7 @@ class SkaldTest extends TestCase
 
     public function testCreateMemoWithMinimalData(): void
     {
-        $this->mockServer->queueResponse(200, ['ok' => true]);
+        $this->mockServer->queueResponse(201, ['memo_uuid' => 'minimal-memo-uuid']);
 
         $memoData = new MemoData(
             title: 'Minimal Test Memo',
@@ -84,7 +84,7 @@ class SkaldTest extends TestCase
 
         $response = $this->client->createMemo($memoData);
 
-        $this->assertTrue($response->ok);
+        $this->assertEquals('minimal-memo-uuid', $response->memo_uuid);
     }
 
     public function testSearchWithChunkVectorSearch(): void
@@ -356,7 +356,7 @@ class SkaldTest extends TestCase
 
     public function testUpdateMemoSuccess(): void
     {
-        $this->mockServer->queueResponse(200, ['ok' => true]);
+        $this->mockServer->queueResponse(200, ['memo_uuid' => 'test-memo-uuid']);
 
         $updateData = new UpdateMemoData(
             title: 'Updated Title',
@@ -365,7 +365,7 @@ class SkaldTest extends TestCase
 
         $response = $this->client->updateMemo('test-memo-uuid', $updateData);
 
-        $this->assertTrue($response->ok);
+        $this->assertEquals('test-memo-uuid', $response->memo_uuid);
 
         $request = $this->mockServer->getLastRequest();
         $this->assertEquals('/api/v1/memo/test-memo-uuid', $request['path']);
@@ -379,7 +379,7 @@ class SkaldTest extends TestCase
 
     public function testUpdateMemoWithAllFields(): void
     {
-        $this->mockServer->queueResponse(200, ['ok' => true]);
+        $this->mockServer->queueResponse(200, ['memo_uuid' => 'memo-uuid']);
 
         $updateData = new UpdateMemoData(
             title: 'New Title',
@@ -392,7 +392,7 @@ class SkaldTest extends TestCase
 
         $response = $this->client->updateMemo('memo-uuid', $updateData);
 
-        $this->assertTrue($response->ok);
+        $this->assertEquals('memo-uuid', $response->memo_uuid);
 
         $request = $this->mockServer->getLastRequest();
         $body = json_decode($request['body'], true);
@@ -406,7 +406,7 @@ class SkaldTest extends TestCase
 
     public function testUpdateMemoWithPartialFields(): void
     {
-        $this->mockServer->queueResponse(200, ['ok' => true]);
+        $this->mockServer->queueResponse(200, ['memo_uuid' => 'memo-uuid']);
 
         $updateData = new UpdateMemoData(
             title: 'Only Title Updated'
@@ -414,7 +414,7 @@ class SkaldTest extends TestCase
 
         $response = $this->client->updateMemo('memo-uuid', $updateData);
 
-        $this->assertTrue($response->ok);
+        $this->assertEquals('memo-uuid', $response->memo_uuid);
 
         $request = $this->mockServer->getLastRequest();
         $body = json_decode($request['body'], true);
@@ -480,7 +480,7 @@ class SkaldTest extends TestCase
 
     public function testUpdateMemoWithReferenceId(): void
     {
-        $this->mockServer->queueResponse(200, ['ok' => true]);
+        $this->mockServer->queueResponse(200, ['memo_uuid' => 'resolved-memo-uuid']);
 
         $updateData = new UpdateMemoData(
             title: 'Updated via Reference ID'
@@ -488,7 +488,7 @@ class SkaldTest extends TestCase
 
         $response = $this->client->updateMemo('external-ref-123', $updateData, 'reference_id');
 
-        $this->assertTrue($response->ok);
+        $this->assertEquals('resolved-memo-uuid', $response->memo_uuid);
 
         $request = $this->mockServer->getLastRequest();
         $this->assertStringContainsString('id_type=reference_id', $request['path']);
@@ -499,7 +499,7 @@ class SkaldTest extends TestCase
 
     public function testUpdateMemoWithReferenceIdAndProjectId(): void
     {
-        $this->mockServer->queueResponse(200, ['ok' => true]);
+        $this->mockServer->queueResponse(200, ['memo_uuid' => 'resolved-memo-uuid-456']);
 
         $updateData = new UpdateMemoData(
             content: 'New content'
@@ -511,7 +511,7 @@ class SkaldTest extends TestCase
             'reference_id',
         );
 
-        $this->assertTrue($response->ok);
+        $this->assertEquals('resolved-memo-uuid-456', $response->memo_uuid);
 
         $request = $this->mockServer->getLastRequest();
         $this->assertStringContainsString('id_type=reference_id', $request['path']);

@@ -7,12 +7,12 @@ namespace Skald\Types;
 /**
  * Response from creating a memo.
  *
- * @property bool $ok Always true on success
+ * @property string $memo_uuid The UUID of the created memo
  */
 final class CreateMemoResponse
 {
     public function __construct(
-        public readonly bool $ok
+        public readonly string $memo_uuid
     ) {
     }
 
@@ -24,6 +24,6 @@ final class CreateMemoResponse
      */
     public static function fromArray(array $data): self
     {
-        return new self($data['ok'] ?? false);
+        return new self($data['memo_uuid']);
     }
 }

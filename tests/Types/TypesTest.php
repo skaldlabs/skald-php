@@ -23,10 +23,10 @@ class TypesTest extends TestCase
 {
     public function testCreateMemoResponseFromArray(): void
     {
-        $data = ['ok' => true];
+        $data = ['memo_uuid' => 'test-uuid-abc123'];
         $response = CreateMemoResponse::fromArray($data);
 
-        $this->assertTrue($response->ok);
+        $this->assertEquals('test-uuid-abc123', $response->memo_uuid);
     }
 
     public function testSearchResultFromArray(): void

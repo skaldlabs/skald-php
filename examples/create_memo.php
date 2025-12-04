@@ -54,7 +54,7 @@ try {
     ));
 
     echo "✓ Memo created successfully!\n";
-    echo "  Status: " . ($result->ok ? 'OK' : 'FAILED') . "\n\n";
+    echo "  Memo UUID: {$result->memo_uuid}\n\n";
 } catch (SkaldException $e) {
     echo "✗ Error: {$e->getMessage()}\n\n";
 }
