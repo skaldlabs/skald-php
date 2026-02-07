@@ -10,9 +10,6 @@ use Skald\Types\ChatRequest;
 use Skald\Types\ChatResponse;
 use Skald\Types\ChatStreamEvent;
 use Skald\Types\CreateMemoResponse;
-use Skald\Types\GenerateDocRequest;
-use Skald\Types\GenerateDocResponse;
-use Skald\Types\GenerateDocStreamEvent;
 use Skald\Types\MemoData;
 use Skald\Types\SearchRequest;
 use Skald\Types\SearchResponse;
@@ -22,8 +19,8 @@ use Skald\Types\UpdateMemoData;
  * Skald API Client for PHP.
  *
  * A knowledge base management system that automatically processes memos
- * (summarizes, chunks, and indexes them) and provides semantic search,
- * AI chat, and document generation capabilities.
+ * (summarizes, chunks, and indexes them) and provides semantic search
+ * and AI chat capabilities.
  *
  * @example
  * ```php
@@ -38,7 +35,7 @@ use Skald\Types\UpdateMemoData;
  * // Search memos
  * $results = $skald->search(new SearchRequest(
  *     query: 'quarterly goals',
- *     searchMethod: SearchMethod::CHUNK_VECTOR_SEARCH
+ *     searchMethod: SearchMethod::CHUNK_SEMANTIC_SEARCH
  * ));
  *
  * // Chat with your knowledge base
@@ -156,13 +153,14 @@ final class Skald
      * Ask questions about the knowledge base using an AI agent (non-streaming).
      *
      * @param ChatRequest $chatParams Chat parameters
-     * @return ChatResponse
+     * @return string Response text with citations
      * @throws SkaldException
      */
-    public function chat(ChatRequest $chatParams): ChatResponse
+    public function chat(ChatRequest $chatParams): string
     {
         $response = $this->post('/api/v1/chat', $chatParams->toArray(false));
-        return ChatResponse::fromArray($response);
+        $chatResponse = ChatResponse::fromArray($response);
+        return $chatResponse->response;
     }
 
     /**
@@ -190,47 +188,6 @@ final class Skald
     public function streamedChat(ChatRequest $chatParams): Generator
     {
         yield from $this->streamPost('/api/v1/chat', $chatParams->toArray(true), ChatStreamEvent::class);
-    }
-
-    /**
-     * Generate documents based on prompts and retrieved context (non-streaming).
-     *
-     * @param GenerateDocRequest $generateParams Generation parameters
-     * @return GenerateDocResponse
-     * @throws SkaldException
-     */
-    public function generateDoc(GenerateDocRequest $generateParams): GenerateDocResponse
-    {
-        $response = $this->post('/api/v1/generate', $generateParams->toArray(false));
-        return GenerateDocResponse::fromArray($response);
-    }
-
-    /**
-     * Generate documents with streaming responses.
-     *
-     * Returns a generator that yields GenerateDocStreamEvent objects.
-     * Events have a type ('token' or 'done') and optional content.
-     *
-     * @param GenerateDocRequest $generateParams Generation parameters
-     * @return Generator<GenerateDocStreamEvent>
-     * @throws SkaldException
-     *
-     * @example
-     * ```php
-     * $stream = $skald->streamedGenerateDoc(new GenerateDocRequest(
-     *     prompt: 'Write a technical specification',
-     *     rules: 'Include Architecture section'
-     * ));
-     * foreach ($stream as $event) {
-     *     if ($event->isToken()) {
-     *         echo $event->content;
-     *     }
-     * }
-     * ```
-     */
-    public function streamedGenerateDoc(GenerateDocRequest $generateParams): Generator
-    {
-        yield from $this->streamPost('/api/v1/generate', $generateParams->toArray(true), GenerateDocStreamEvent::class);
     }
 
     /**
